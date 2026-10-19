@@ -36,3 +36,6 @@
 - v1：单文件 last-write-wins（`~/.agent-status` 直接写）。
 - v2：按 agent 分文件 `~/.agent-status.d/<agent>` + 优先级聚合，
   对外契约（`~/.agent-status` 格式与语义）保持不变。
+- v2.1：并发加固，对外契约不变——临时文件 + `mv` 原子替换写入（读端不会看到半截内容）、
+  聚合段 mkdir 锁互斥（防止并发 hook 用旧快照覆盖掉刚写入的 attention）、
+  同优先级 tie-break 改用小数秒 mtime（原来 1 秒粒度内退化为按字母序）。
