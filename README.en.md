@@ -93,7 +93,8 @@ System Settings → General → Login Items → `+` → pick `AgentLights.app`.
 ## Usage
 
 - Drag with the left mouse button to move it (position is remembered).
-- Right-click → Quit.
+- Drag an edge/corner to resize (aspect-locked 84:296, 0.5x–2x; size is remembered).
+- Right-click → Reset Size restores the default size; Quit exits.
 - No Dock icon, never steals focus, floats above all windows on all Spaces.
 
 ## Status contract (same for every display)
