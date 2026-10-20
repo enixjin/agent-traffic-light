@@ -1,2 +1,4 @@
 .DS_Store
-AgentLights.app/
+
+# build output (see build.sh)
+*.app/
