@@ -42,10 +42,51 @@ func readStatus() -> (String, String) {
     return (s, agent)
 }
 
+// ---------------- diagonal resize cursors ----------------
+// AppKit has no public diagonal resize cursor, so draw one:
+// 24x24, white outline + black core (visible on light and dark backgrounds),
+// hotspot at the center. northEast=false draws ↖↘, true draws ↗↙.
+func makeCornerCursor(northEast: Bool) -> NSCursor {
+    let side: CGFloat = 24
+    let img = NSImage(size: NSSize(width: side, height: side), flipped: true) { _ in
+        let a = northEast ? NSPoint(x: side - 5, y: 5) : NSPoint(x: 5, y: 5)
+        let b = northEast ? NSPoint(x: 5, y: side - 5) : NSPoint(x: side - 5, y: side - 5)
+        let shaft = NSBezierPath()
+        shaft.move(to: a)
+        shaft.line(to: b)
+        func head(at tip: NSPoint, toward o: NSPoint) -> NSBezierPath {
+            let ux: CGFloat = (o.x > tip.x) ? 1 : -1
+            let uy: CGFloat = (o.y > tip.y) ? 1 : -1
+            let p = NSBezierPath()
+            p.move(to: tip)
+            p.line(to: NSPoint(x: tip.x + 9 * ux, y: tip.y))
+            p.line(to: NSPoint(x: tip.x, y: tip.y + 9 * uy))
+            p.close()
+            return p
+        }
+        let h1 = head(at: a, toward: b)
+        let h2 = head(at: b, toward: a)
+        NSColor.white.setFill(); NSColor.white.setStroke()   // outline
+        shaft.lineWidth = 5.5; shaft.stroke()
+        h1.fill(); h2.fill()
+        NSColor.black.setFill(); NSColor.black.setStroke()   // core
+        shaft.lineWidth = 1.8; shaft.stroke()
+        h1.fill(); h2.fill()
+        return true
+    }
+    return NSCursor(image: img, hotSpot: NSPoint(x: side / 2, y: side / 2))
+}
+
 // ---------------- light view ----------------
 class LightView: NSView {
     var status = "idle"
     var agent = ""
+
+    static let nwseCursor = makeCornerCursor(northEast: false)
+    static let neswCursor = makeCornerCursor(northEast: true)
+    static let edgeZone: CGFloat = 6      // edge hover band (points)
+    static let cornerZone: CGFloat = 14   // corner hover square (points)
+    var trackingArea: NSTrackingArea?
 
     override var isFlipped: Bool { true }
 
@@ -84,6 +125,43 @@ class LightView: NSView {
             at: NSPoint(x: (b.width - size.width) / 2, y: 264 * s),
             withAttributes: attrs)
     }
+
+    // ---------------- resize-cursor feedback ----------------
+    // A borderless window shows no resize cursor on its own, so track the
+    // mouse and swap the cursor per zone: corners -> diagonal (custom image),
+    // edges -> system left/right or up/down arrows, interior -> normal arrow.
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = trackingArea { removeTrackingArea(t) }
+        let t = NSTrackingArea(rect: bounds,
+                               options: [.mouseMoved, .mouseEnteredAndExited,
+                                         .cursorUpdate, .activeAlways, .inVisibleRect],
+                               owner: self, userInfo: nil)
+        addTrackingArea(t)
+        trackingArea = t
+    }
+
+    func resizeCursor(at pointInWindow: NSPoint) -> NSCursor? {
+        let p = convert(pointInWindow, from: nil)
+        let b = bounds
+        let c = Self.cornerZone
+        let left = p.x <= c, right = p.x >= b.width - c
+        let top = p.y <= c, bottom = p.y >= b.height - c   // flipped: y=0 is top
+        if (left && top) || (right && bottom) { return Self.nwseCursor }
+        if (right && top) || (left && bottom) { return Self.neswCursor }
+        let e = Self.edgeZone
+        if p.x <= e || p.x >= b.width - e { return NSCursor.resizeLeftRight }
+        if p.y <= e || p.y >= b.height - e { return NSCursor.resizeUpDown }
+        return nil
+    }
+
+    func applyCursor(at pointInWindow: NSPoint) {
+        (resizeCursor(at: pointInWindow) ?? NSCursor.arrow).set()
+    }
+
+    override func mouseMoved(with event: NSEvent) { applyCursor(at: event.locationInWindow) }
+    override func cursorUpdate(with event: NSEvent) { applyCursor(at: event.locationInWindow) }
+    override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
 
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
@@ -124,6 +202,7 @@ panel.isOpaque = false
 panel.backgroundColor = .clear                 // transparent rounded corners
 panel.hasShadow = true
 panel.isMovableByWindowBackground = true       // drag from anywhere
+panel.acceptsMouseMovedEvents = true           // hover tracking for resize cursors
 panel.collectionBehavior = [.canJoinAllSpaces, .stationary]
 panel.contentAspectRatio = NSSize(width: 84, height: 296)  // keep 84:296 while resizing
 panel.minSize = NSSize(width: 42, height: 148)             // 0.5x
