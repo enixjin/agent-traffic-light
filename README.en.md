@@ -114,3 +114,19 @@ System Settings → General → Login Items → `+` → pick `AgentLights.app`.
   Clear manually: `~/.agent-lights/set_status.sh idle <agent-name>`.
 - Qoder CLI hooks support is unconfirmed by the official docs; wired per the
   IDE / JetBrains plugin spec for now.
+
+## Platform support & roadmap
+
+**Today**
+
+- macOS only (native AppKit, macOS 11+); no Windows / Linux builds yet.
+- Agents: Claude Code, OpenCode, and Qoder — those three only.
+
+**Roadmap (no dates promised)**
+
+- Windows / Linux: the status contract (`~/.agent-status`) is platform-agnostic,
+  so each platform only needs a read-only display client (tray app, Electron,
+  etc.); the hooks and aggregation-script logic carry over as-is.
+- More agents (e.g. Codex, Cursor): onboarding an agent only means writing
+  hooks that call `set_status.sh <status> <agent>` — zero changes to the
+  aggregator or any display.

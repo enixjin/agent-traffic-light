@@ -106,3 +106,18 @@ cp opencode-agent-lights.ts ~/.config/opencode/plugins/agent-lights.ts
 - agent 异常退出没走到 SessionEnd/Stop 时，它的状态文件会残留（灯可能一直显示它在工作）。
   手动清除：`~/.agent-lights/set_status.sh idle <agent名>`。
 - Qoder CLI 的 hooks 支持情况官方未明确，按 IDE / JetBrains 插件口径先接。
+
+## 平台支持与 Roadmap
+
+**当前**
+
+- 平台：仅 macOS（AppKit 原生，macOS 11+），暂无 Windows / Linux 版本。
+- Agent：仅支持 Claude Code、OpenCode、Qoder 三家。
+
+**Roadmap（不承诺时间表）**
+
+- Windows / Linux 版：状态契约（`~/.agent-status`）与平台无关，
+  各平台只需实现一个只读显示端（托盘小程序 / Electron 等均可），
+  hooks 与聚合脚本的逻辑可直接复用。
+- 更多 agent（如 Codex、Cursor）：架构上接入新 agent 只需要写一份
+  调用 `set_status.sh <status> <agent>` 的 hooks，聚合端与显示端零改动。
