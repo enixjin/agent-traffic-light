@@ -88,7 +88,8 @@ cp opencode-agent-lights.ts ~/.config/opencode/plugins/agent-lights.ts
 
 - 左键按住拖动可移动位置（自动记住，下次打开还在原位）。
 - 拖动窗口边缘/角落可缩放（等比 84:296，范围 0.5x–2x，大小自动记住）。
-- 右键 → Reset Size 恢复默认大小；退出红绿灯。
+- 右键 → Reset Size 恢复默认大小；右键菜单里还有 Theme → Dark / Light 可切换深浅主题，默认 Dark。
+- 退出红绿灯：右键 → Quit。
 - 无 Dock 图标，不抢焦点，盖在所有窗口上（所有桌面空间都显示）。
 
 ## 状态契约（显示端统一口径）

@@ -30,6 +30,54 @@ let lampDefs: [(key: String, y: CGFloat, bright: NSColor, dim: NSColor, name: St
      NSColor(red: 0.10, green: 0.17, blue: 0.28, alpha: 1), "Idle"),
 ]
 
+// ---------------- theme ----------------
+enum Theme: String, CaseIterable {
+    case dark
+    case light
+
+    var housingColor: NSColor {
+        switch self {
+        case .dark: return NSColor(white: 0.11, alpha: 1)
+        case .light: return NSColor(white: 0.95, alpha: 1)
+        }
+    }
+
+    var bezelColor: NSColor {
+        switch self {
+        case .dark: return NSColor(white: 0.17, alpha: 1)
+        case .light: return NSColor(white: 0.85, alpha: 1)
+        }
+    }
+
+    var labelColor: NSColor {
+        switch self {
+        case .dark: return NSColor(white: 0.68, alpha: 1)
+        case .light: return NSColor(white: 0.20, alpha: 1)
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .dark: return "Dark"
+        case .light: return "Light"
+        }
+    }
+}
+
+let themeDefaultsKey = "AgentLightsTheme"
+
+func loadTheme() -> Theme {
+    guard let raw = UserDefaults.standard.string(forKey: themeDefaultsKey),
+          let theme = Theme(rawValue: raw) else {
+        return .dark
+    }
+    return theme
+}
+
+func saveTheme(_ theme: Theme) {
+    UserDefaults.standard.set(theme.rawValue, forKey: themeDefaultsKey)
+}
+
 func readStatus() -> (String, String) {
     guard let raw = try? String(contentsOfFile: stateFile, encoding: .utf8) else {
         return ("idle", "")
@@ -81,6 +129,7 @@ func makeCornerCursor(northEast: Bool) -> NSCursor {
 class LightView: NSView {
     var status = "idle"
     var agent = ""
+    var theme = Theme.dark
 
     static let nwseCursor = makeCornerCursor(northEast: false)
     static let neswCursor = makeCornerCursor(northEast: true)
@@ -96,14 +145,14 @@ class LightView: NSView {
         // so width/84 == height/296; min() just guards against rounding)
         let s = min(b.width / 84, b.height / 296)
         // housing (rounded)
-        NSColor(white: 0.11, alpha: 1).setFill()
+        theme.housingColor.setFill()
         NSBezierPath(roundedRect: b, xRadius: 18 * s, yRadius: 18 * s).fill()
         // the three lamps
         let cx = b.width / 2
         for def in lampDefs {
             let active = (def.key == status)
             let c = NSPoint(x: cx, y: def.y * s)
-            NSColor(white: 0.17, alpha: 1).setFill()  // bezel
+            theme.bezelColor.setFill()  // bezel
             NSBezierPath(ovalIn: NSRect(x: c.x - 26 * s, y: c.y - 26 * s, width: 52 * s, height: 52 * s)).fill()
             (active ? def.bright : def.dim).setFill()  // lamp
             NSBezierPath(ovalIn: NSRect(x: c.x - 21 * s, y: c.y - 21 * s, width: 42 * s, height: 42 * s)).fill()
@@ -112,18 +161,30 @@ class LightView: NSView {
                 NSBezierPath(ovalIn: NSRect(x: c.x - 9 * s, y: c.y - 13 * s, width: 10 * s, height: 8 * s)).fill()
             }
         }
-        // status label
+        // status label (two-line layout: status name + agent name)
         let name = lampDefs.first(where: { $0.key == status })?.name ?? ""
-        let text = agent.isEmpty ? name : "\(name) · \(agent)"
+        let text = agent.isEmpty ? name : "\(name)\n\(agent)"
         let fontSize = min(14, max(9, 11 * s))
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.alignment = .center
+        paragraphStyle.lineBreakMode = .byTruncatingTail
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: fontSize),
-            .foregroundColor: NSColor(white: 0.68, alpha: 1),
+            .foregroundColor: theme.labelColor,
+            .paragraphStyle: paragraphStyle,
         ]
-        let size = (text as NSString).size(withAttributes: attrs)
-        (text as NSString).draw(
-            at: NSPoint(x: (b.width - size.width) / 2, y: 264 * s),
-            withAttributes: attrs)
+        let maxTextWidth = b.width - 16 * s
+        let labelAreaHeight: CGFloat = 74 * s
+        let size = (text as NSString).boundingRect(
+            with: NSSize(width: maxTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin],
+            attributes: attrs).size
+        let textRect = NSRect(
+            x: 8 * s,
+            y: 222 * s + (labelAreaHeight - size.height) / 2,
+            width: maxTextWidth,
+            height: size.height)
+        (text as NSString).draw(in: textRect, withAttributes: attrs)
     }
 
     // ---------------- resize-cursor feedback ----------------
@@ -171,12 +232,35 @@ class LightView: NSView {
         reset.target = self
         menu.addItem(reset)
         menu.addItem(.separator())
+
+        let themeMenu = NSMenu(title: "Theme")
+        for t in Theme.allCases {
+            let item = NSMenuItem(title: t.displayName,
+                                  action: #selector(themeItemSelected(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.representedObject = t
+            item.state = (t == theme) ? .on : .off
+            themeMenu.addItem(item)
+        }
+        let themeItem = NSMenuItem(title: "Theme", action: nil, keyEquivalent: "")
+        themeItem.submenu = themeMenu
+        menu.addItem(themeItem)
+
+        menu.addItem(.separator())
         let item = NSMenuItem(title: "Quit",
                               action: #selector(NSApplication.terminate(_:)),
                               keyEquivalent: "")
         item.target = NSApp
         menu.addItem(item)
         NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc func themeItemSelected(_ sender: NSMenuItem) {
+        guard let newTheme = sender.representedObject as? Theme else { return }
+        theme = newTheme
+        saveTheme(theme)
+        needsDisplay = true
     }
 
     @objc func resetSize() {
@@ -191,7 +275,9 @@ class LightView: NSView {
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)  // no Dock icon, floating only
 
+let currentTheme = loadTheme()
 let view = LightView(frame: NSRect(x: 0, y: 0, width: 84, height: 296))
+view.theme = currentTheme
 
 let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 84, height: 296),
                     styleMask: [.borderless, .nonactivatingPanel, .resizable],
