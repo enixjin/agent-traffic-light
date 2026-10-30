@@ -72,6 +72,14 @@ export default {
             setStatus("working")
           }
 
+          // 提问（红灯）：question 工具发出的是 form.* 事件
+          if (type === "form.created") {
+            setStatus("attention")
+          }
+          if (type === "form.replied" || type === "form.cancelled") {
+            setStatus("working")
+          }
+
           // 会话被删除/出错 = 清掉本 agent 状态，避免残留红灯永远压住其他 agent
           if (type === "session.deleted" || type === "session.error") {
             setStatus("idle")
